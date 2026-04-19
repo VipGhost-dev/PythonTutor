@@ -234,4 +234,32 @@ print('Done!')
         Vector2Int pos = robot.GetPosition();
         return $"{pos.x},{pos.y}";
     }
+
+    public string ScanArea(int radius = 1)
+    {
+        if (farmGrid == null) return "{}";
+        
+        Vector2Int pos = robot.GetPosition();
+        var result = new System.Text.StringBuilder();
+        result.Append("{");
+        
+        for (int x = -radius; x <= radius; x++)
+        {
+            for (int y = -radius; y <= radius; y++)
+            {
+                Vector2Int scanPos = pos + new Vector2Int(x, y);
+                result.Append($"\"{scanPos.x},{scanPos.y}\":");
+                result.Append("{");
+                result.Append($"\"has_crop\":{farmGrid.HasCrop(scanPos).ToString().ToLower()},");
+                result.Append($"\"walkable\":{farmGrid.IsWalkable(scanPos).ToString().ToLower()}");
+                result.Append("},");
+            }
+        }
+        
+        if (result[result.Length - 1] == ',')
+            result.Length--;
+        
+        result.Append("}");
+        return result.ToString();
+    }
 }

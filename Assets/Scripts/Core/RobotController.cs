@@ -8,17 +8,28 @@ public class RobotController : MonoBehaviour
     public float moveSpeed = 5f;
     public float stepDelay = 0.2f;
     
+    [Header("Visuals")]
+    public GameObject body;
+    public ParticleSystem moveParticles;
+    
     private Vector2Int gridPosition;
     private Vector3 targetPosition;
     private bool isMoving = false;
     private bool canMove = true;
     private Queue<Vector2Int> moveQueue = new Queue<Vector2Int>();
+    private FarmGrid farmGrid;
     
     void Start()
     {
-        gridPosition = new Vector2Int(7, 7);
-        transform.position = new Vector3(gridPosition.x, 0, gridPosition.y);
-        targetPosition = transform.position;
+        farmGrid = FindObjectOfType<FarmGrid>();
+        
+        // Стартовая позиция - центр поля
+        if (farmGrid != null)
+        {
+            gridPosition = new Vector2Int(farmGrid.width / 2, farmGrid.height / 2);
+            transform.position = new Vector3(gridPosition.x, 0, gridPosition.y);
+            targetPosition = transform.position;
+        }
     }
     
     void Update()
@@ -37,6 +48,9 @@ public class RobotController : MonoBehaviour
                 transform.position = targetPosition;
                 isMoving = false;
                 canMove = true;
+                
+                if (moveParticles != null)
+                    moveParticles.Stop();
             }
         }
     }
@@ -45,9 +59,26 @@ public class RobotController : MonoBehaviour
     {
         if (isMoving) yield break;
         
-        isMoving = true;    
+        isMoving = true;
         canMove = false;
         targetPosition = new Vector3(newGridPos.x, 0, newGridPos.y);
+        
+        if (moveParticles != null)
+            moveParticles.Play();
+        
+        // Анимация поворота
+        Vector3 direction = (targetPosition - transform.position).normalized;
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            float elapsed = 0;
+            while (elapsed < 0.1f)
+            {
+                elapsed += Time.deltaTime;
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, elapsed / 0.1f);
+                yield return null;
+            }
+        }
         
         yield return new WaitUntil(() => !isMoving);
         
@@ -58,15 +89,17 @@ public class RobotController : MonoBehaviour
     
     public bool Move(Vector2Int direction)
     {
-        Vector2Int newPos = gridPosition + direction;
-        FarmGrid farmGrid = FindObjectOfType<FarmGrid>();
+        if (farmGrid == null) return false;
         
-        if (farmGrid != null && farmGrid.IsWalkable(newPos))
+        Vector2Int newPos = gridPosition + direction;
+        
+        if (farmGrid.IsWalkable(newPos))
         {
             moveQueue.Enqueue(newPos);
             return true;
         }
         
+        Debug.Log($"Cannot move to {newPos} - blocked");
         return false;
     }
     
