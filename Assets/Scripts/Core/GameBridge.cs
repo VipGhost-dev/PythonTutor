@@ -1,8 +1,27 @@
+// Assets/Scripts/Core/GameBridge.cs
 using UnityEngine;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Text;
 using System;
+using System.Collections;
+
+[System.Serializable]
+public class CommandData
+{
+    public string action;
+    public string direction;
+    public string seed;
+    public float seconds;
+}
+
+[System.Serializable]
+public class PythonResponse
+{
+    public bool success;
+    public string output;
+    public CommandData[] commands;
+}
 
 public class GameBridge : MonoBehaviour
 {
@@ -17,28 +36,212 @@ public class GameBridge : MonoBehaviour
     
     async void Start()
     {
+        // Находим компоненты если не назначены
         if (pythonBridge == null) pythonBridge = FindObjectOfType<PythonBridge>();
         if (uiManager == null) uiManager = FindObjectOfType<UIManager>();
+        if (robot == null) robot = FindObjectOfType<RobotController>();
+        if (farmGrid == null) farmGrid = FindObjectOfType<FarmGrid>();
+        if (inventory == null) inventory = FindObjectOfType<PlayerInventory>();
         
+        // Подписываемся на события робота
+        if (robot != null)
+        {
+            robot.OnPositionChanged += OnRobotPositionChanged;
+            robot.OnMovementComplete += OnRobotMovementComplete;
+        }
+        
+        // Тестируем соединение с Python сервером
         string testResult = await pythonBridge.TestConnection();
         Debug.Log($"Connection test: {testResult}");
         
-        // Тестовый код через 1 секунду
-        Invoke("RunPythonTest", 1f);
+        // Загружаем пример кода после небольшой задержки
+        Invoke("LoadDemoCode", 1f);
     }
     
-    void RunPythonTest()
+    void LoadDemoCode()
     {
-        string testCode = @"
-print('Hello from player code!')
-print('Testing multiple lines')
+        string demoCode = @"
+print('=== RoboFarmer Started ===')
+print(f'Start position: {api.get_position()}')
+
+# Двигаемся вперёд
 for i in range(3):
-    print(f'Number {i}')
-print('Done!')
-".TrimStart();
+    result = api.move('right')
+    print(f'Move {i+1}: {result}, position: {api.get_position()}')
+
+# Двигаемся вниз
+for i in range(2):
+    result = api.move('down')   
+    print(f'Move {i+1}: {result}, position: {api.get_position()}')
+
+# Возвращаемся
+for i in range(3):
+    result = api.move('left')
+    print(f'Move {i+1}: {result}, position: {api.get_position()}')
+
+print('=== Movement Demo Complete ===')
+";
         
-        ExecutePlayerCode(testCode);
+        // Раскомментируйте для автоматического выполнения демо
+        // ExecutePlayerCode(demoCode);
     }
+    
+    void OnRobotPositionChanged(Vector2Int newPosition)
+    {
+        Debug.Log($"Robot moved to: {newPosition}");
+        uiManager?.AddConsoleOutput($"Position: {newPosition.x}, {newPosition.y}");
+    }
+    
+    void OnRobotMovementComplete()
+    {
+        Debug.Log("Movement completed");
+    }
+    
+    // ============ МЕТОДЫ ДЛЯ ВЫЗОВА ИЗ PYTHON ============
+    public string MoveForward()
+    {
+        bool success = robot.MoveForward();
+
+        return success ? "OK" : "BLOCKED";
+    }
+
+    public void TurnLeft()
+    {
+        robot.TurnLeft();
+    }
+
+    public void TurnRight()
+    {
+        robot.TurnRight();
+    }
+
+    public string MoveRobot(string direction)
+    {
+        if (robot == null) return "ERROR: Robot not found";
+        
+        Debug.Log($"🎮 MoveRobot called: {direction}");
+        
+        Vector2Int moveVector = direction.ToLower() switch
+        {
+            "up" => new Vector2Int(0, 1),
+            "down" => new Vector2Int(0, -1),
+            "left" => new Vector2Int(-1, 0),
+            "right" => new Vector2Int(1, 0),
+            _ => new Vector2Int(0, 0)
+        };
+        
+        bool success = robot.Move(moveVector);
+        
+        if (success)
+        {
+            uiManager?.ShowMessage($"Moving {direction}");
+            return "OK";
+        }
+        else
+        {
+            uiManager?.ShowMessage($"Cannot move {direction} - blocked!");
+            return "BLOCKED";
+        }
+    }
+    
+    public int HarvestCurrent()
+    {
+        if (farmGrid == null || robot == null) return 0;
+        
+        Vector2Int pos = robot.GetPosition();
+        int value = farmGrid.HarvestAtPosition(pos);
+        
+        if (value > 0)
+        {
+            inventory?.AddCoins(value);
+            uiManager?.ShowFloatingText($"+{value}💰", robot.transform.position);
+            uiManager?.ShowMessage($"Harvested! +{value} coins");
+        }
+        else
+        {
+            uiManager?.ShowMessage("Nothing to harvest here");
+        }
+        
+        return value;
+    }
+    
+    public bool PlantSeed(string seedType)
+    {
+        if (farmGrid == null || robot == null || inventory == null) return false;
+        
+        Vector2Int pos = robot.GetPosition();
+        
+        if (!farmGrid.CanPlantAtPosition(pos))
+        {
+            uiManager?.ShowMessage("Cannot plant here!");
+            return false;
+        }
+        
+        if (!inventory.HasSeed(seedType))
+        {
+            uiManager?.ShowMessage($"No {seedType} seeds!");
+            return false;
+        }
+        
+        farmGrid.PlantAtPosition(pos, seedType);
+        inventory.RemoveSeed(seedType);
+        uiManager?.ShowMessage($"Planted {seedType}! 🌱");
+        
+        return true;
+    }
+    
+    public string GetRobotPosition()
+    {
+        if (robot == null) return "0,0";
+        Vector2Int pos = robot.GetPosition();
+        return $"{pos.x},{pos.y}";
+    }
+    
+    public string ScanArea(int radius)
+    {
+        if (farmGrid == null || robot == null) return "{}";
+        
+        Vector2Int center = robot.GetPosition();
+        var result = new Dictionary<string, object>();
+        var cells = new List<object>();
+        
+        for (int x = -radius; x <= radius; x++)
+        {
+            for (int y = -radius; y <= radius; y++)
+            {
+                Vector2Int pos = center + new Vector2Int(x, y);
+                var cellData = new Dictionary<string, object>
+                {
+                    ["x"] = pos.x,
+                    ["y"] = pos.y,
+                    ["has_crop"] = farmGrid.HasCrop(pos),
+                    ["can_plant"] = farmGrid.CanPlantAtPosition(pos),
+                    ["is_walkable"] = farmGrid.IsWalkable(pos),
+                    ["is_soil"] = farmGrid.IsSoil(pos)
+                };
+                cells.Add(cellData);
+            }
+        }
+        
+        result["center"] = new { x = center.x, y = center.y };
+        result["radius"] = radius;
+        result["cells"] = cells;
+        
+        return JsonUtility.ToJson(result);
+    }
+    
+    public int GetCoins()
+    {
+        return inventory?.GetCoins() ?? 0;
+    }
+    
+    public void Wait(float seconds)
+    {
+        // Простая задержка (блокирующая)
+        System.Threading.Thread.Sleep((int)(seconds * 1000));
+    }
+    
+    // ============ ВЫПОЛНЕНИЕ КОДА ============
     
     public async void ExecutePlayerCode(string code)
     {
@@ -51,21 +254,32 @@ print('Done!')
         isExecuting = true;
         uiManager?.ShowMessage("Executing Python code...");
         
-        // Очищаем код от лишних отступов
         string cleanedCode = CleanCodeIndentation(code);
-        Debug.Log($"Cleaned code:\n{cleanedCode}");
+        Debug.Log($"Executing code:\n{cleanedCode}");
         
         string result = await pythonBridge.ExecutePythonCode(cleanedCode);
         Debug.Log($"Raw response: {result}");
+
+        Debug.Log(result);
         
-        // Простой парсинг ответа
         if (!string.IsNullOrEmpty(result))
         {
             if (result.Contains("\"success\": true") || result.Contains("\"success\":true"))
             {
-                // Извлекаем output
+                PythonResponse response =
+                    JsonUtility.FromJson<PythonResponse>(result);
+
+                if (response.commands != null &&
+                    response.commands.Length > 0)
+                {
+                    StartCoroutine(
+                        ExecuteCommands(response.commands)
+                    );
+                }
+
+                Debug.Log($"Commands count: {response.commands?.Length}");
                 string output = ExtractJsonValue(result, "output");
-                uiManager?.ShowMessage($"✅ Complete!\n{output}");
+                uiManager?.ShowMessage($"✅ Complete!");
                 uiManager?.AddConsoleOutput(output);
             }
             else
@@ -84,6 +298,40 @@ print('Done!')
         isExecuting = false;
     }
     
+    private string CleanCodeIndentation(string code)
+    {
+        if (string.IsNullOrEmpty(code)) return code;
+        
+        string[] lines = code.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
+        
+        int minIndent = int.MaxValue;
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            
+            int indent = 0;
+            foreach (char c in line)
+            {
+                if (c == ' ' || c == '\t') indent++;
+                else break;
+            }
+            if (indent < minIndent) minIndent = indent;
+        }
+        
+        if (minIndent == int.MaxValue || minIndent == 0) return code;
+        
+        var cleanedLines = new List<string>();
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                cleanedLines.Add("");
+            else
+                cleanedLines.Add(line.Length > minIndent ? line.Substring(minIndent) : line);
+        }
+        
+        return string.Join("\n", cleanedLines);
+    }
+    
     private string ExtractJsonValue(string json, string key)
     {
         try
@@ -93,15 +341,11 @@ print('Done!')
             if (startIndex == -1) return "";
             
             startIndex += searchFor.Length;
-            
-            // Пропускаем пробелы
             while (startIndex < json.Length && (json[startIndex] == ' ' || json[startIndex] == '\t'))
                 startIndex++;
             
-            // Проверяем тип значения
             if (json[startIndex] == '"')
             {
-                // Строковое значение
                 startIndex++;
                 int endIndex = json.IndexOf('"', startIndex);
                 if (endIndex == -1) return "";
@@ -109,7 +353,6 @@ print('Done!')
             }
             else
             {
-                // Булево или числовое значение
                 int endIndex = startIndex;
                 while (endIndex < json.Length && json[endIndex] != ',' && json[endIndex] != '}')
                     endIndex++;
@@ -123,143 +366,82 @@ print('Done!')
         }
     }
     
-    private string CleanCodeIndentation(string code)
+    void OnDestroy()
     {
-        if (string.IsNullOrEmpty(code))
-            return code;
-        
-        string[] lines = code.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
-        
-        // Находим минимальный отступ
-        int minIndent = int.MaxValue;
-        foreach (string line in lines)
+        if (robot != null)
         {
-            if (string.IsNullOrWhiteSpace(line))
-                continue;
-            
-            int indent = 0;
-            foreach (char c in line)
-            {
-                if (c == ' ' || c == '\t')
-                    indent++;
-                else
-                    break;
-            }
-            if (indent < minIndent)
-                minIndent = indent;
+            robot.OnPositionChanged -= OnRobotPositionChanged;
+            robot.OnMovementComplete -= OnRobotMovementComplete;
         }
-        
-        if (minIndent == int.MaxValue || minIndent == 0)
-            return code;
-        
-        // Удаляем отступы
-        var cleanedLines = new List<string>();
-        foreach (string line in lines)
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                cleanedLines.Add("");
-            }
-            else
-            {
-                string cleanedLine = line.Length > minIndent ? line.Substring(minIndent) : line;
-                cleanedLines.Add(cleanedLine);
-            }
-        }
-        
-        return string.Join("\n", cleanedLines);
-    }
-    
-    // Методы для вызова из Python
-    public string MoveRobot(string direction)
-    {
-        if (robot == null) return "ERROR: No robot";
-        
-        Vector2Int moveVector = direction.ToLower() switch
-        {
-            "up" => new Vector2Int(0, 1),
-            "down" => new Vector2Int(0, -1),
-            "left" => new Vector2Int(-1, 0),
-            "right" => new Vector2Int(1, 0),
-            _ => new Vector2Int(0, 0)
-        };
-        
-        bool success = robot.Move(moveVector);
-        return success ? "OK" : "BLOCKED";
-    }
-    
-    public int HarvestCurrent()
-    {
-        if (farmGrid == null) return 0;
-        
-        Vector2Int pos = robot.GetPosition();
-        int value = farmGrid.HarvestAtPosition(pos);
-        
-        if (value > 0)
-        {
-            inventory?.AddCoins(value);
-            uiManager?.ShowFloatingText($"+{value}", robot.transform.position);
-        }
-        
-        return value;
-    }
-    
-    public bool PlantSeed(string seedType)
-    {
-        if (farmGrid == null || inventory == null) return false;
-        
-        Vector2Int pos = robot.GetPosition();
-        
-        if (!farmGrid.CanPlantAtPosition(pos))
-        {
-            uiManager?.ShowMessage("Cannot plant here!");
-            return false;
-        }
-        
-        if (!inventory.HasSeed(seedType))
-        {
-            uiManager?.ShowMessage($"No {seedType} seeds!");
-            return false;
-        }
-        
-        farmGrid.PlantAtPosition(pos, seedType);
-        inventory.RemoveSeed(seedType);
-        uiManager?.ShowMessage($"Planted {seedType}!");
-        
-        return true;
-    }
-    
-    public string GetRobotPosition()
-    {
-        Vector2Int pos = robot.GetPosition();
-        return $"{pos.x},{pos.y}";
     }
 
-    public string ScanArea(int radius = 1)
+    private IEnumerator ExecuteCommands(CommandData[] commands)
     {
-        if (farmGrid == null) return "{}";
-        
-        Vector2Int pos = robot.GetPosition();
-        var result = new System.Text.StringBuilder();
-        result.Append("{");
-        
-        for (int x = -radius; x <= radius; x++)
+        foreach (var cmd in commands)
         {
-            for (int y = -radius; y <= radius; y++)
+            Debug.Log($"Executing: {cmd.action}");
+
+            switch (cmd.action)
             {
-                Vector2Int scanPos = pos + new Vector2Int(x, y);
-                result.Append($"\"{scanPos.x},{scanPos.y}\":");
-                result.Append("{");
-                result.Append($"\"has_crop\":{farmGrid.HasCrop(scanPos).ToString().ToLower()},");
-                result.Append($"\"walkable\":{farmGrid.IsWalkable(scanPos).ToString().ToLower()}");
-                result.Append("},");
+                case "move":
+
+                    MoveRobot(cmd.direction);
+
+                    yield return new WaitUntil(
+                        () => !robot.IsMoving()
+                    );
+
+                    Debug.Log("MOVE FINISHED");
+
+                    break;
+
+                case "plant":
+
+                    PlantSeed(cmd.seed);
+
+                    yield return new WaitForSeconds(0.2f);
+
+                    break;
+
+                case "harvest":
+
+                    HarvestCurrent();
+
+                    yield return new WaitForSeconds(0.2f);
+
+                    break;
+
+                case "wait":
+
+                    yield return new WaitForSeconds(cmd.seconds);
+
+                    break;
+                 case "forward":
+
+                    robot.MoveForward();
+
+                    yield return new WaitUntil(
+                        () => !robot.IsMoving()
+                    );
+
+                    break;
+
+                case "turn_left":
+
+                    robot.TurnLeft();
+
+                    yield return new WaitForSeconds(0.2f);
+
+                    break;
+
+                case "turn_right":
+
+                    robot.TurnRight();
+
+                    yield return new WaitForSeconds(0.2f);
+
+                    break;
             }
         }
-        
-        if (result[result.Length - 1] == ',')
-            result.Length--;
-        
-        result.Append("}");
-        return result.ToString();
     }
 }

@@ -330,4 +330,10 @@ public class FarmGrid : MonoBehaviour
         }
         return $"Seed: {seed}\nSoil: {soil}, Grass: {grass}, Stones: {stone}\nCrops: {crops.Count}";
     }
+
+    public bool IsSoil(Vector2Int position)
+{
+    if (!cells.ContainsKey(position)) return false;
+    return cells[position].type == Cell.CellType.Soil;
+}
 }

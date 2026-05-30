@@ -43,7 +43,8 @@ def execute_code(code):
         
         return {
             'success': True,
-            'output': output
+            'output': output,
+            'commands': api.commands
         }
         
     except Exception as e:
@@ -63,45 +64,69 @@ def execute_code(code):
 
 class GameAPI:
     """API для взаимодействия с игрой"""
-    
+
+    def __init__(self):
+        self.commands = []
+
     def move(self, direction):
         valid_directions = ['up', 'down', 'left', 'right']
+
         if direction not in valid_directions:
-            return f"ERROR: Invalid direction. Use: {valid_directions}"
-        
-        print(f"🤖 Moving {direction}")
-        return "OK"
-    
+            return False
+
+        self.commands.append({
+            "action": "move",
+            "direction": direction
+        })
+
+        return True
+
     def harvest(self):
-        print(f"🌾 Harvesting at current position")
-        return 10
-    
+        self.commands.append({
+            "action": "harvest"
+        })
+
+        return True
+
     def plant(self, seed_type):
-        valid_seeds = ['wheat', 'corn', 'carrot']
-        if seed_type not in valid_seeds:
-            return f"ERROR: Invalid seed. Use: {valid_seeds}"
-        
-        print(f"🌱 Planting {seed_type}")
+        self.commands.append({
+            "action": "plant",
+            "seed": seed_type
+        })
+
+        return True
+
+    def get_position(self):
+        return (0, 0)
+
+    def scan(self, radius=1):
+        return {}
+
+    def get_coins(self):
+        return 0
+
+    def wait(self, seconds):
+        self.commands.append({
+            "action": "wait",
+            "seconds": seconds
+        })
+
         return True
     
-    def get_position(self):
-        return (5, 5)
+    def forward(self):
+        self.commands.append({
+            "action": "forward"
+        })
     
-    def scan(self, radius=1):
-        return {
-            "center": (5, 5),
-            "radius": radius,
-            "cells": []
-        }
-    
-    def get_coins(self):
-        return 100
-    
-    def wait(self, seconds):
-        import time
-        time.sleep(seconds)
-        return f"Waited {seconds} seconds"
+    def turn_left(self):
+        self.commands.append({
+            "action": "turn_left"
+        })
 
+    def turn_right(self):
+        self.commands.append({
+            "action": "turn_right"
+        })
 
 def handle_client(client_socket, addr):
     """Обработка одного клиента"""
