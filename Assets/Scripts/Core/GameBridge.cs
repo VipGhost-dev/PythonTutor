@@ -58,34 +58,6 @@ public class GameBridge : MonoBehaviour
         Invoke("LoadDemoCode", 1f);
     }
     
-    void LoadDemoCode()
-    {
-        string demoCode = @"
-print('=== RoboFarmer Started ===')
-print(f'Start position: {api.get_position()}')
-
-# Двигаемся вперёд
-for i in range(3):
-    result = api.move('right')
-    print(f'Move {i+1}: {result}, position: {api.get_position()}')
-
-# Двигаемся вниз
-for i in range(2):
-    result = api.move('down')   
-    print(f'Move {i+1}: {result}, position: {api.get_position()}')
-
-# Возвращаемся
-for i in range(3):
-    result = api.move('left')
-    print(f'Move {i+1}: {result}, position: {api.get_position()}')
-
-print('=== Movement Demo Complete ===')
-";
-        
-        // Раскомментируйте для автоматического выполнения демо
-        // ExecutePlayerCode(demoCode);
-    }
-    
     void OnRobotPositionChanged(Vector2Int newPosition)
     {
         Debug.Log($"Robot moved to: {newPosition}");
@@ -134,12 +106,12 @@ print('=== Movement Demo Complete ===')
         
         if (success)
         {
-            uiManager?.ShowMessage($"Moving {direction}");
+            uiManager?.LogInfo($"Moving {direction}");
             return "OK";
         }
         else
         {
-            uiManager?.ShowMessage($"Cannot move {direction} - blocked!");
+            uiManager?.LogWarning($"Cannot move {direction} - blocked!");
             return "BLOCKED";
         }
     }
@@ -155,11 +127,11 @@ print('=== Movement Demo Complete ===')
         {
             inventory?.AddCoins(value);
             uiManager?.ShowFloatingText($"+{value}💰", robot.transform.position);
-            uiManager?.ShowMessage($"Harvested! +{value} coins");
+            uiManager?.LogSuccess($"Harvested! +{value} coins");
         }
         else
         {
-            uiManager?.ShowMessage("Nothing to harvest here");
+            uiManager?.LogInfo("Nothing to harvest here");
         }
         
         return value;
@@ -173,19 +145,19 @@ print('=== Movement Demo Complete ===')
         
         if (!farmGrid.CanPlantAtPosition(pos))
         {
-            uiManager?.ShowMessage("Cannot plant here!");
+            uiManager?.LogWarning("Cannot plant here!");
             return false;
         }
         
         if (!inventory.HasSeed(seedType))
         {
-            uiManager?.ShowMessage($"No {seedType} seeds!");
+            uiManager?.LogWarning($"No {seedType} seeds!");
             return false;
         }
         
         farmGrid.PlantAtPosition(pos, seedType);
         inventory.RemoveSeed(seedType);
-        uiManager?.ShowMessage($"Planted {seedType}! 🌱");
+        uiManager?.LogSuccess($"Planted {seedType}! 🌱");
         
         return true;
     }
@@ -247,12 +219,12 @@ print('=== Movement Demo Complete ===')
     {
         if (isExecuting)
         {
-            uiManager?.ShowMessage("Code is already executing!");
+            uiManager?.LogInfo("Code is already executing!");
             return;
         }
         
         isExecuting = true;
-        uiManager?.ShowMessage("Executing Python code...");
+        uiManager?.LogInfo("Executing Python code...");
         
         string cleanedCode = CleanCodeIndentation(code);
         Debug.Log($"Executing code:\n{cleanedCode}");
@@ -279,20 +251,20 @@ print('=== Movement Demo Complete ===')
 
                 Debug.Log($"Commands count: {response.commands?.Length}");
                 string output = ExtractJsonValue(result, "output");
-                uiManager?.ShowMessage($"✅ Complete!");
+                uiManager?.LogSuccess($"Complete!");
                 uiManager?.AddConsoleOutput(output);
             }
             else
             {
                 string error = ExtractJsonValue(result, "error");
                 if (string.IsNullOrEmpty(error)) error = "Unknown error";
-                uiManager?.ShowMessage($"❌ Error: {error}");
+                uiManager?.LogError($"Error: {error}");
                 Debug.LogError($"Python error: {error}");
             }
         }
         else
         {
-            uiManager?.ShowMessage("❌ Error: Empty response from server");
+            uiManager?.LogError("Error: Empty response from server");
         }
         
         isExecuting = false;

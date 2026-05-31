@@ -13,6 +13,8 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI coinsText;
     public GameObject messagePanel;
     public TextMeshProUGUI messageText;
+
+    [SerializeField] private ScrollRect outputScrollRect;
     
     private GameBridge gameBridge;
     private PlayerInventory inventory;
@@ -134,6 +136,34 @@ public class UIManager : MonoBehaviour
         // Можно реализовать позже
         Debug.Log($"Floating text: {text}");
     }
+
+    // Расцветка в консоли вывода
+    public void AddConsoleLine(string text, string color)
+    {
+        outputText.text += $"<color={color}>{text}</color>\n";
+
+        Canvas.ForceUpdateCanvases();
+        outputScrollRect.verticalNormalizedPosition = 0f;
+    }
+    public void LogInfo(string text)
+    {
+        AddConsoleLine(text, "white");
+    }
+
+    public void LogSuccess(string text)
+    {
+        AddConsoleLine(text, "green");
+    }
+
+    public void LogWarning(string text)
+    {
+        AddConsoleLine(text, "yellow");
+    }
+
+    public void LogError(string text)
+    {
+        AddConsoleLine(text, "red");
+    }
     
     public void AddConsoleOutput(string output)
     {
@@ -144,7 +174,10 @@ public class UIManager : MonoBehaviour
         if (outputText != null)
         {
             // Добавляем новую строку сверху
-            outputText.text = output + "\n\n" + outputText.text;
+            outputText.text = output + "\n\n" + outputText.text;    
+            Canvas.ForceUpdateCanvases();
+
+            outputScrollRect.verticalNormalizedPosition = 0f;
             
             // Ограничиваем количество строк
             string[] lines = outputText.text.Split('\n');
