@@ -35,10 +35,6 @@ public class UIManager : MonoBehaviour
         
         LoadExampleCode();
         
-        // Скрываем панель сообщений
-        if (messagePanel != null)
-            messagePanel.SetActive(false);
-        
         // Обновляем UI каждую секунду
         InvokeRepeating("UpdateUI", 0, 1f);
     }
@@ -47,7 +43,7 @@ public class UIManager : MonoBehaviour
     {
         if (inventory != null && coinsText != null)
         {
-            coinsText.text = $"💰 {inventory.GetCoins()}";
+            coinsText.text = $"{inventory.GetCoins()}";
         }
     }
     

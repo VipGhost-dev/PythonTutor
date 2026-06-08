@@ -19,6 +19,11 @@ public class FarmGrid : MonoBehaviour
     public Material soilMaterial;
     public Material grassMaterial;
     public Material stoneMaterial;
+
+    [Header("Crop Prefabs")]
+    public GameObject wheatPrefab;
+    public GameObject cornPrefab;
+    public GameObject carrotPrefab;
     
     private Dictionary<Vector2Int, Cell> cells = new Dictionary<Vector2Int, Cell>();
     private Dictionary<Vector2Int, CropData> crops = new Dictionary<Vector2Int, CropData>();
@@ -230,30 +235,22 @@ public class FarmGrid : MonoBehaviour
     }
     
     GameObject CreatePlantVisual(string seedType)
+{
+    switch (seedType)
     {
-        GameObject plant = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        plant.transform.localScale = new Vector3(0.3f, 0.2f, 0.3f);
-        
-        // Цвет и форма в зависимости от типа
-        switch (seedType)
-        {
-            case "wheat":
-                plant.GetComponent<Renderer>().material.color = new Color(0.9f, 0.8f, 0.2f);
-                break;
-            case "corn":
-                plant.GetComponent<Renderer>().material.color = new Color(0.9f, 0.6f, 0.1f);
-                plant.transform.localScale = new Vector3(0.35f, 0.4f, 0.35f);
-                break;
-            case "carrot":
-                plant.GetComponent<Renderer>().material.color = new Color(0.9f, 0.4f, 0.1f);
-                break;
-            default:
-                plant.GetComponent<Renderer>().material.color = Color.green;
-                break;
-        }
-        
-        return plant;
+        case "wheat":
+            return Instantiate(wheatPrefab);
+
+        case "corn":
+            return Instantiate(cornPrefab);
+
+        case "carrot":
+            return Instantiate(carrotPrefab);
+
+        default:
+            return null;
     }
+}
     
     public int HarvestAtPosition(Vector2Int position)
     {
