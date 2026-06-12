@@ -11,9 +11,9 @@ public class FarmGrid : MonoBehaviour
     
     [Header("Generation Settings")]
     public int seed = -1;  // -1 = случайный seed
-    public float stoneDensity = 0.05f;  // 5% камней
-    public float grassDensity = 0.1f;   // 10% травы (препятствия)
-    public int minSoilArea = 3;  // Минимальный размер области земли
+    public float stoneDensity = 0.05f;
+    public float grassDensity = 0.06f;
+    public int minSoilArea = 15;
     
     [Header("Visuals")]
     public Material soilMaterial;
@@ -43,7 +43,6 @@ public class FarmGrid : MonoBehaviour
     
     public void GenerateNewField()
     {
-        // Инициализируем генератор случайных чисел
         if (seed == -1)
             seed = System.Environment.TickCount;
         
@@ -55,7 +54,6 @@ public class FarmGrid : MonoBehaviour
     
     void GenerateGrid()
     {
-        // Очищаем старые клетки
         foreach (Transform child in transform)
         {
             Destroy(child.gameObject);
@@ -63,7 +61,6 @@ public class FarmGrid : MonoBehaviour
         cells.Clear();
         crops.Clear();
         
-        // Сначала создаём все клетки как землю
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -83,7 +80,6 @@ public class FarmGrid : MonoBehaviour
             }
         }
         
-        // Генерируем ландшафт
         GenerateTerrain();
         
         Debug.Log($"Grid generated: {width}x{height} with seed {seed}");
@@ -91,26 +87,23 @@ public class FarmGrid : MonoBehaviour
     
     void GenerateTerrain()
     {
-        // Шаг 1: Все клетки - земля по умолчанию
         foreach (var cell in cells)
         {
             cell.Value.SetType(Cell.CellType.Soil);
         }
         
-        // Шаг 2: Создаём границы (трава)
         for (int x = 0; x < width; x++)
         {
-            cells[new Vector2Int(x, 0)].SetType(Cell.CellType.Grass);      // Нижняя граница
-            cells[new Vector2Int(x, height - 1)].SetType(Cell.CellType.Grass); // Верхняя граница
+            cells[new Vector2Int(x, 0)].SetType(Cell.CellType.Grass);      
+            cells[new Vector2Int(x, height - 1)].SetType(Cell.CellType.Grass); 
         }
         
         for (int y = 0; y < height; y++)
         {
-            cells[new Vector2Int(0, y)].SetType(Cell.CellType.Grass);      // Левая граница
-            cells[new Vector2Int(width - 1, y)].SetType(Cell.CellType.Grass); // Правая граница
+            cells[new Vector2Int(0, y)].SetType(Cell.CellType.Grass);      
+            cells[new Vector2Int(width - 1, y)].SetType(Cell.CellType.Grass); 
         }
         
-        // Шаг 3: Генерируем камни (препятствия)
         int stoneCount = (int)(width * height * stoneDensity);
         for (int i = 0; i < stoneCount; i++)
         {
@@ -118,14 +111,12 @@ public class FarmGrid : MonoBehaviour
             int y = random.Next(1, height - 1);
             Vector2Int pos = new Vector2Int(x, y);
             
-            // Не ставим камни на границах
             if (cells[pos].type == Cell.CellType.Soil)
             {
                 cells[pos].SetType(Cell.CellType.Stone);
             }
         }
         
-        // Шаг 4: Генерируем травяные пятна (препятствия)
         int grassCount = (int)(width * height * grassDensity);
         for (int i = 0; i < grassCount; i++)
         {
@@ -139,7 +130,6 @@ public class FarmGrid : MonoBehaviour
             }
         }
         
-        // Шаг 5: Создаём "озёра" из травы (круглые области)
         int lakeCount = random.Next(1, 4);
         for (int i = 0; i < lakeCount; i++)
         {
@@ -156,7 +146,6 @@ public class FarmGrid : MonoBehaviour
                         Vector2Int pos = new Vector2Int(centerX + x, centerY + y);
                         if (cells.ContainsKey(pos) && cells[pos].type == Cell.CellType.Soil)
                         {
-                            // С вероятностью 70% ставим траву
                             if (random.NextDouble() < 0.7f)
                                 cells[pos].SetType(Cell.CellType.Grass);
                         }
@@ -164,32 +153,10 @@ public class FarmGrid : MonoBehaviour
                 }
             }
         }
-        
-        // Шаг 6: Создаём "поляны" с редкими ресурсами (опционально)
-        GenerateSpecialAreas();
-    }
-    
-    void GenerateSpecialAreas()
-    {
-        // Генерируем плодородные зоны (где урожай растёт быстрее)
-        int fertileZones = random.Next(2, 5);
-        for (int i = 0; i < fertileZones; i++)
-        {
-            int x = random.Next(2, width - 2);
-            int y = random.Next(2, height - 2);
-            Vector2Int pos = new Vector2Int(x, y);
-            
-            if (cells[pos].type == Cell.CellType.Soil)
-            {
-                // Можно добавить визуальный эффект для плодородной зоны
-                // cells[pos].isFertile = true;
-            }
-        }
     }
     
     public void RegenerateField()
     {
-        // Генерируем новый seed
         seed = System.Environment.TickCount;
         random = new System.Random(seed);
         GenerateGrid();
@@ -218,7 +185,6 @@ public class FarmGrid : MonoBehaviour
     {
         if (!CanPlantAtPosition(position)) return;
         
-        // Создаём визуал растения
         GameObject plant = CreatePlantVisual(seedType);
         
         CropData crop = new CropData
@@ -235,48 +201,21 @@ public class FarmGrid : MonoBehaviour
     }
     
     GameObject CreatePlantVisual(string seedType)
-{
-    switch (seedType)
     {
-        case "wheat":
-            return Instantiate(wheatPrefab);
-
-        case "corn":
-            return Instantiate(cornPrefab);
-
-        case "carrot":
-            return Instantiate(carrotPrefab);
-
-        default:
-            return null;
-    }
-}
-    
-    public int HarvestAtPosition(Vector2Int position)
-    {
-        if (!crops.ContainsKey(position)) return 0;
-        
-        CropData crop = crops[position];
-        int value = GetCropValue(crop.type);
-        
-        if (crop.visual != null)
-            Destroy(crop.visual);
-        
-        cells[position].SetCrop(null);
-        crops.Remove(position);
-        
-        return value;
-    }
-    
-    int GetCropValue(string type)
-    {
-        return type switch
+        switch (seedType)
         {
-            "wheat" => 10,
-            "corn" => 15,
-            "carrot" => 20,
-            _ => 5
-        };
+            case "wheat":
+                return Instantiate(wheatPrefab);
+
+            case "corn":
+                return Instantiate(cornPrefab);
+
+            case "carrot":
+                return Instantiate(carrotPrefab);
+
+            default:
+                return null;
+        }
     }
     
     public bool HasCrop(Vector2Int position)
@@ -328,9 +267,17 @@ public class FarmGrid : MonoBehaviour
         return $"Seed: {seed}\nSoil: {soil}, Grass: {grass}, Stones: {stone}\nCrops: {crops.Count}";
     }
 
+    public bool HasCropOfType(Vector2Int position, string cropType)
+    {
+        if (!crops.ContainsKey(position))
+            return false;
+
+        return crops[position].type == cropType;
+    }
+
     public bool IsSoil(Vector2Int position)
-{
-    if (!cells.ContainsKey(position)) return false;
-    return cells[position].type == Cell.CellType.Soil;
-}
+    {
+        if (!cells.ContainsKey(position)) return false;
+        return cells[position].type == Cell.CellType.Soil;
+    }
 }

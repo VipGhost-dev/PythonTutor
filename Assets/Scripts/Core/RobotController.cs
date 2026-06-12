@@ -1,4 +1,3 @@
-// Assets/Scripts/Core/RobotController.cs
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -39,7 +38,6 @@ public class RobotController : MonoBehaviour
         if (farmGrid == null)
             farmGrid = FindObjectOfType<FarmGrid>();
         
-        // Стартовая позиция
         if (farmGrid != null)
         {
             gridPosition = farmGrid.GetRandomSoilPosition();
@@ -64,7 +62,6 @@ public class RobotController : MonoBehaviour
         
         if (isMoving)
         {
-            // Плавное движение с ускорением
             currentSpeed = Mathf.Lerp(currentSpeed, moveSpeed, Time.deltaTime / accelerationTime);
             transform.position = Vector3.MoveTowards(transform.position, targetPosition, currentSpeed * Time.deltaTime);
             transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
@@ -78,21 +75,26 @@ public class RobotController : MonoBehaviour
                 );
             }
 
-            // Вращаем колёса
             RotateWheels();
             
             if (Vector3.Distance(transform.position, targetPosition) < 0.01f)
             {
-                Debug.Log("TARGET REACHED");
-                
                 transform.position = targetPosition;
                 isMoving = false;
                 currentSpeed = 0f;
 
+                Debug.Log($"TARGET REACHED: {gridPosition}");
+
+                OnPositionChanged?.Invoke(gridPosition);
                 OnMovementComplete?.Invoke();
             }
         }
     }
+    public Vector2Int GetFacingDirection()
+    {
+        return facingDirection;
+    }
+
     public void TurnLeft()
     {
         facingDirection = new Vector2Int(
@@ -136,7 +138,6 @@ public class RobotController : MonoBehaviour
 
         if (isMoving) yield break;
         
-        // Проверка на возможность движения
         if (farmGrid != null && !farmGrid.IsWalkable(newGridPos))
         {
             Debug.Log($"Cannot move to {newGridPos} - blocked");
@@ -145,32 +146,20 @@ public class RobotController : MonoBehaviour
         
         isMoving = true;
         
-        // Обновляем позицию
         gridPosition = newGridPos;
         
-        // Вычисляем целевую позицию
         targetPosition = new Vector3(newGridPos.x, ROBOT_HEIGHT, newGridPos.y);
         
-        // Поворачиваемся к цели
         Vector3 direction = (targetPosition - transform.position).normalized;
         if (direction != Vector3.zero)
         {
             targetRotation = Quaternion.LookRotation(direction);
         }
         
-        // Анимация наклона камеры
-        if (cameraObject != null)
-        {
-            StartCoroutine(TiltCamera(direction));
-        }
-        
-        // Ждём завершения движения
         yield return new WaitWhile(() => isMoving);
         
-        // Событие об изменении позиции
         OnPositionChanged?.Invoke(gridPosition);
         
-        // Небольшая задержка перед следующим движением
         yield return new WaitForSeconds(0.1f);
 
         Debug.Log($"Reached {gridPosition}");   

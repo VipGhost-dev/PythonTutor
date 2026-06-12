@@ -1,4 +1,3 @@
-// Assets/Scripts/Core/GameBridge.cs
 using UnityEngine;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -28,33 +27,29 @@ public class GameBridge : MonoBehaviour
     [Header("References")]
     public RobotController robot;
     public FarmGrid farmGrid;
-    public PlayerInventory inventory;
     public PythonBridge pythonBridge;
     public UIManager uiManager;
-    
+    public QuestManager questManager;
+
     private bool isExecuting = false;
     
     async void Start()
     {
-        // Находим компоненты если не назначены
         if (pythonBridge == null) pythonBridge = FindObjectOfType<PythonBridge>();
         if (uiManager == null) uiManager = FindObjectOfType<UIManager>();
         if (robot == null) robot = FindObjectOfType<RobotController>();
         if (farmGrid == null) farmGrid = FindObjectOfType<FarmGrid>();
-        if (inventory == null) inventory = FindObjectOfType<PlayerInventory>();
-        
-        // Подписываемся на события робота
+        if (questManager == null) questManager = FindObjectOfType<QuestManager>();
+
         if (robot != null)
         {
             robot.OnPositionChanged += OnRobotPositionChanged;
             robot.OnMovementComplete += OnRobotMovementComplete;
         }
         
-        // Тестируем соединение с Python сервером
         string testResult = await pythonBridge.TestConnection();
         Debug.Log($"Connection test: {testResult}");
         
-        // Загружаем пример кода после небольшой задержки
         Invoke("LoadDemoCode", 1f);
     }
     
@@ -116,30 +111,9 @@ public class GameBridge : MonoBehaviour
         }
     }
     
-    public int HarvestCurrent()
-    {
-        if (farmGrid == null || robot == null) return 0;
-        
-        Vector2Int pos = robot.GetPosition();
-        int value = farmGrid.HarvestAtPosition(pos);
-        
-        if (value > 0)
-        {
-            inventory?.AddCoins(value);
-            uiManager?.ShowFloatingText($"+{value}💰", robot.transform.position);
-            uiManager?.LogSuccess($"Harvested! +{value} coins");
-        }
-        else
-        {
-            uiManager?.LogInfo("Nothing to harvest here");
-        }
-        
-        return value;
-    }
-    
     public bool PlantSeed(string seedType)
     {
-        if (farmGrid == null || robot == null || inventory == null) return false;
+        if (farmGrid == null || robot == null) return false;
         
         Vector2Int pos = robot.GetPosition();
         
@@ -149,15 +123,8 @@ public class GameBridge : MonoBehaviour
             return false;
         }
         
-        if (!inventory.HasSeed(seedType))
-        {
-            uiManager?.LogWarning($"No {seedType} seeds!");
-            return false;
-        }
-        
         farmGrid.PlantAtPosition(pos, seedType);
-        inventory.RemoveSeed(seedType);
-        uiManager?.LogSuccess($"Planted {seedType}! 🌱");
+        uiManager?.LogSuccess($"Planted {seedType}!");
         
         return true;
     }
@@ -202,14 +169,8 @@ public class GameBridge : MonoBehaviour
         return JsonUtility.ToJson(result);
     }
     
-    public int GetCoins()
-    {
-        return inventory?.GetCoins() ?? 0;
-    }
-    
     public void Wait(float seconds)
     {
-        // Простая задержка (блокирующая)
         System.Threading.Thread.Sleep((int)(seconds * 1000));
     }
     
@@ -371,13 +332,7 @@ public class GameBridge : MonoBehaviour
 
                     PlantSeed(cmd.seed);
 
-                    yield return new WaitForSeconds(0.2f);
-
-                    break;
-
-                case "harvest":
-
-                    HarvestCurrent();
+                    questManager?.CheckQuest();
 
                     yield return new WaitForSeconds(0.2f);
 
@@ -388,7 +343,7 @@ public class GameBridge : MonoBehaviour
                     yield return new WaitForSeconds(cmd.seconds);
 
                     break;
-                 case "forward":
+                case "forward":
 
                     robot.MoveForward();
 
@@ -402,6 +357,8 @@ public class GameBridge : MonoBehaviour
 
                     robot.TurnLeft();
 
+                    questManager?.CheckQuest();
+
                     yield return new WaitForSeconds(0.2f);
 
                     break;
@@ -410,7 +367,9 @@ public class GameBridge : MonoBehaviour
 
                     robot.TurnRight();
 
-                    yield return new WaitForSeconds(0.2f);
+                    questManager?.CheckQuest();
+
+                    yield return new WaitForSeconds(0.2f);             
 
                     break;
             }

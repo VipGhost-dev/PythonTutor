@@ -5,7 +5,6 @@ import traceback
 import base64
 
 def execute_code(code):
-    """Выполнение Python кода игрока"""
     output_lines = []
     
     def custom_print(*args):
@@ -63,8 +62,6 @@ def execute_code(code):
 
 
 class GameAPI:
-    """API для взаимодействия с игрой"""
-
     def __init__(self):
         self.commands = []
 
@@ -77,13 +74,6 @@ class GameAPI:
         self.commands.append({
             "action": "move",
             "direction": direction
-        })
-
-        return True
-
-    def harvest(self):
-        self.commands.append({
-            "action": "harvest"
         })
 
         return True
@@ -129,7 +119,6 @@ class GameAPI:
         })
 
 def handle_client(client_socket, addr):
-    """Обработка одного клиента"""
     try:
         # Получаем данные
         data = client_socket.recv(65536)
@@ -137,13 +126,13 @@ def handle_client(client_socket, addr):
             return
         
         data_str = data.decode('utf-8')
-        print(f"\n📥 Received from {addr}")
+        print(f"\n Received from {addr}")
         
         # Парсим JSON
         try:
             request = json.loads(data_str)
         except json.JSONDecodeError as e:
-            print(f"❌ JSON decode error: {e}")
+            print(f" JSON decode error: {e}")
             error_response = {'success': False, 'error': f'Invalid JSON: {e}'}
             client_socket.send(json.dumps(error_response).encode('utf-8'))
             return
@@ -151,18 +140,18 @@ def handle_client(client_socket, addr):
         command = request.get('command', '')
         encoded_data = request.get('data', '')
         
-        print(f"📋 Command: '{command}'")
+        print(f"Command: '{command}'")
         
         # Обрабатываем команду
         if command == 'execute':
             # Декодируем Base64
             try:
                 code = base64.b64decode(encoded_data).decode('utf-8')
-                print(f"📝 Decoded code ({len(code)} chars)")
+                print(f"Decoded code ({len(code)} chars)")
                 print(f"   Preview: {code[:100]}...")
                 response = execute_code(code)
             except Exception as e:
-                print(f"❌ Base64 decode error: {e}")
+                print(f"Base64 decode error: {e}")
                 response = {'success': False, 'error': f'Failed to decode code: {e}'}
                 
         elif command == 'test':
@@ -173,14 +162,14 @@ def handle_client(client_socket, addr):
         # Отправляем ответ
         response_json = json.dumps(response)
         client_socket.send(response_json.encode('utf-8'))
-        print(f"📤 Sent response: success={response.get('success', False)}")
+        print(f"Sent response: success={response.get('success', False)}")
         
     except Exception as e:
-        print(f"❌ Error in handle_client: {e}")
+        print(f"Error in handle_client: {e}")
         traceback.print_exc()
     finally:
         client_socket.close()
-        print(f"🔌 Connection closed")
+        print(f"Connection closed")
 
 
 def start_server(host='localhost', port=9999):
@@ -191,20 +180,18 @@ def start_server(host='localhost', port=9999):
     server_socket.listen(5)
     
     print("=" * 50)
-    print("🐍 FARMING SERVER FOR ROBOFARMER")
+    print("FARMING SERVER FOR PYTHONTUTOR")
     print("=" * 50)
-    print(f"🚀 Server started on {host}:{port}")
-    print("Waiting for Unity client...")
-    print("Press Ctrl+C to stop the server")
+    print(f"Server started on {host}:{port}")
     print("-" * 50)
     
     try:
         while True:
             client_socket, addr = server_socket.accept()
-            print(f"\n📡 New connection from {addr}")
+            print(f"\nNew connection from {addr}")
             handle_client(client_socket, addr)
     except KeyboardInterrupt:
-        print("\n\n🛑 Stopping server...")
+        print("\n\nStopping server...")
     finally:
         server_socket.close()
         print("Server stopped")

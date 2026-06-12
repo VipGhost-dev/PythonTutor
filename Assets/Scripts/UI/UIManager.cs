@@ -10,14 +10,12 @@ public class UIManager : MonoBehaviour
     public Button runButton;
     public Button resetButton;
     public TextMeshProUGUI outputText;
-    public TextMeshProUGUI coinsText;
     public GameObject messagePanel;
     public TextMeshProUGUI messageText;
 
     [SerializeField] private ScrollRect outputScrollRect;
     
     private GameBridge gameBridge;
-    private PlayerInventory inventory;
     
     [Header("Settings UI")]
 
@@ -25,7 +23,6 @@ public class UIManager : MonoBehaviour
     void Start()
     {
         gameBridge = FindObjectOfType<GameBridge>();
-        inventory = FindObjectOfType<PlayerInventory>();
         
         if (runButton != null)
             runButton.onClick.AddListener(RunCode);
@@ -34,17 +31,6 @@ public class UIManager : MonoBehaviour
             resetButton.onClick.AddListener(ResetGame);
         
         LoadExampleCode();
-        
-        // Обновляем UI каждую секунду
-        InvokeRepeating("UpdateUI", 0, 1f);
-    }
-    
-    void UpdateUI()
-    {
-        if (inventory != null && coinsText != null)
-        {
-            coinsText.text = $"{inventory.GetCoins()}";
-        }
     }
     
     void RunCode()
@@ -78,8 +64,10 @@ public class UIManager : MonoBehaviour
         }
     }
     
-    void ResetGame()
+    public void ResetGame()
     {
+        SaveManager.ResetSave();
+
         UnityEngine.SceneManagement.SceneManager.LoadScene(
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
         );
@@ -89,21 +77,7 @@ public class UIManager : MonoBehaviour
     {
         if (codeInput == null) return;
         
-        codeInput.text = "# RoboFarmer Example\n" +
-                         "# Move in a square pattern\n" +
-                         "\n" +
-                         "for i in range(4):\n" +
-                         "    for j in range(3):\n" +
-                         "        api.move('right')\n" +
-                         "    \n" +
-                         "    api.move('down')\n" +
-                         "    \n" +
-                         "    for j in range(3):\n" +
-                         "        api.move('left')\n" +
-                         "    \n" +
-                         "    api.move('down')\n" +
-                         "\n" +
-                         "print('Harvesting complete!')";
+        codeInput.text = "api.forward()";
     }
     
     public void ShowMessage(string message)
@@ -126,14 +100,7 @@ public class UIManager : MonoBehaviour
         if (messagePanel != null)
             messagePanel.SetActive(false);
     }
-    
-    public void ShowFloatingText(string text, Vector3 worldPosition)
-    {
-        // Можно реализовать позже
-        Debug.Log($"Floating text: {text}");
-    }
 
-    // Расцветка в консоли вывода
     public void AddConsoleLine(string text, string color)
     {
         outputText.text += $"<color={color}>{text}</color>\n";
@@ -169,13 +136,11 @@ public class UIManager : MonoBehaviour
         
         if (outputText != null)
         {
-            // Добавляем новую строку сверху
             outputText.text = output + "\n\n" + outputText.text;    
             Canvas.ForceUpdateCanvases();
 
             outputScrollRect.verticalNormalizedPosition = 0f;
             
-            // Ограничиваем количество строк
             string[] lines = outputText.text.Split('\n');
             if (lines.Length > 50)
             {
